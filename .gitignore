@@ -1,0 +1,9 @@
+# Dependencies
+node_modules 
+
+# Environment variables
+.env
+
+# Configuration files
+vitest.config.js
+eslint.config.js
