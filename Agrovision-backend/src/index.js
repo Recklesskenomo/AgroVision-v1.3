@@ -3,9 +3,15 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/authRoutes.js';
-import sequelize from './config/database.js';
-// Import the User model
-import './models/userModel.js';
+import animalRoutes from './routes/animalRoute.js';
+import { testConnection, query } from './config/database.js';
+import { initializeUserTable } from './models/userModel.js';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config();
@@ -26,25 +32,41 @@ app.use(cookieParser());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api', animalRoutes);
 
 // Test route
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK' });
 });
 
-// Database connection and server start
+// Initialize database tables
+async function initializeTables() {
+    try {
+        // Initialize users table
+        await initializeUserTable();
+
+        // Read and execute animals table initialization
+        const sqlPath = path.join(__dirname, 'db', 'init.sql');
+        const sqlContent = await fs.readFile(sqlPath, 'utf8');
+        await query(sqlContent);
+        console.log('Animals table initialized');
+    } catch (error) {
+        console.error('Error initializing tables:', error);
+        throw error;
+    }
+}
+
+// Server start
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
     try {
         // Test database connection
-        await sequelize.authenticate();
-        console.log('Database connection established.');
+        await testConnection();
         
-        // Force sync in development (this will drop tables if they exist)
-        await sequelize.sync({ force: true });
-        console.log('Database synced and tables created.');
-
+        // Initialize tables
+        await initializeTables();
+        
         // Start server with error handling
         const server = app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);

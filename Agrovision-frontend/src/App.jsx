@@ -7,7 +7,8 @@ import Landing from './components/Landing';
 import Login from './components/Login';
 import Register from './components/Register';
 import Contact from './components/Contact';
-import Dashboard from './components/Dashboard'; // We'll create this
+import Dashboard from './components/Dashboard';
+import AnimalsPage from './pages/AnimalsPage';
 import './App.css';
 
 // Protected Route component
@@ -71,6 +72,14 @@ function App() {
                             element={
                                 <ProtectedRoute>
                                     <Dashboard />
+                                </ProtectedRoute>
+                            } 
+                        />
+                        <Route 
+                            path="/dashboard/animals" 
+                            element={
+                                <ProtectedRoute>
+                                    <AnimalsPage />
                                 </ProtectedRoute>
                             } 
                         />

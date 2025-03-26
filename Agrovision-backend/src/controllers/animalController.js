@@ -14,12 +14,17 @@ export const getAnimals = async (req, res) => {
 
 export const createAnimal = async (req, res) => {
     try {
+        console.log('Received animal data:', req.body); // Debug log
         const animalData = req.body;
         const newAnimal = await animalService.createAnimal(animalData);
-        res.status(200).json(newAnimal);
+        res.status(201).json(newAnimal);
     } catch (err) {
-        console.error('Error adding animal:', err);
-        res.status(500).json({ message: 'Internal Server Error' });
+        console.error('Error in createAnimal controller:', err); // Detailed error log
+        res.status(500).json({ 
+            message: 'Error creating animal',
+            error: err.message,
+            details: err.stack 
+        });
     }
 };
 

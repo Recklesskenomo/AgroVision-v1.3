@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
     const { user } = useAuth();
@@ -22,7 +23,9 @@ const Dashboard = () => {
                             <h3 className="card-title">Animals</h3>
                             <p>Manage your livestock</p>
                             <div className="card-actions justify-end mt-4">
-                                <button className="btn">View Animals</button>
+                                <Link to="/dashboard/animals" className="btn">
+                                    View Animals
+                                </Link>
                             </div>
                         </div>
 
