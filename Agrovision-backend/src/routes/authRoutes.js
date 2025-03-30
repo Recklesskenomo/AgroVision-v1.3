@@ -2,6 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import * as userModel from '../models/userModel.js';
 import { auth, isAdmin, hasRole } from '../middleware/auth.js';
+import { query } from '../config/database.js';
 
 const router = express.Router();
 
@@ -182,7 +183,12 @@ router.get('/me', auth, async (req, res) => {
 // Admin: Get all users
 router.get('/users', auth, isAdmin, async (req, res) => {
     try {
-        const { rows } = await userModel.query('SELECT id, username, email, role, "createdAt", "updatedAt" FROM users');
+        const { rows } = await query(`
+            SELECT u.id, u.username, u.email, u.role, u.user_type, u.department_id, 
+                   d.name as department_name, u."createdAt", u."updatedAt" 
+            FROM users u
+            LEFT JOIN departments d ON u.department_id = d.id
+        `);
         res.json(rows);
     } catch (error) {
         console.error('Error getting users:', error);
@@ -193,17 +199,25 @@ router.get('/users', auth, isAdmin, async (req, res) => {
 // Admin: Create user with specific role
 router.post('/users', auth, isAdmin, async (req, res) => {
     try {
-        const { username, email, password, role } = req.body;
+        const { username, email, password, role, department_id, user_type } = req.body;
         
-        if (!username || !email || !password || !role) {
-            return res.status(400).json({ message: 'All fields are required' });
+        if (!username || !email || !password) {
+            return res.status(400).json({ message: 'Username, email, and password are required' });
         }
         
         // Validate role
         const validRoles = Object.values(userModel.ROLES);
-        if (!validRoles.includes(role)) {
+        if (role && !validRoles.includes(role)) {
             return res.status(400).json({ 
                 message: `Invalid role. Must be one of: ${validRoles.join(', ')}` 
+            });
+        }
+        
+        // Validate user type
+        const validUserTypes = Object.values(userModel.USER_TYPES);
+        if (user_type && !validUserTypes.includes(user_type)) {
+            return res.status(400).json({ 
+                message: `Invalid user type. Must be one of: ${validUserTypes.join(', ')}` 
             });
         }
         
@@ -213,8 +227,15 @@ router.post('/users', auth, isAdmin, async (req, res) => {
             return res.status(400).json({ message: 'Email already registered' });
         }
 
-        // Create new user with specified role
-        const user = await userModel.createUser({ username, email, password, role });
+        // Create new user with specified role and department
+        const user = await userModel.createUser({ 
+            username, 
+            email, 
+            password, 
+            role: role || userModel.ROLES.USER,
+            department_id: department_id || null,
+            user_type: user_type || userModel.USER_TYPES.INTERNAL
+        });
         
         // Don't send sensitive information
         const { password: pwd, refreshToken, ...userInfo } = user;
@@ -257,6 +278,69 @@ router.put('/users/:id/role', auth, isAdmin, async (req, res) => {
         res.json(userInfo);
     } catch (error) {
         console.error('Error updating user role:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Admin: Update user department
+router.put('/users/:id/department', auth, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { department_id } = req.body;
+        
+        // Check if user exists
+        const existingUser = await userModel.findById(id);
+        if (!existingUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Update user department
+        const updatedUser = await userModel.updateUserDepartment(id, department_id);
+        
+        // Don't send sensitive information
+        const { password, refreshToken, ...userInfo } = updatedUser;
+        res.json(userInfo);
+    } catch (error) {
+        console.error('Error updating user department:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Admin: Update user type
+router.put('/users/:id/usertype', auth, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { user_type } = req.body;
+        
+        if (!user_type) {
+            return res.status(400).json({ message: 'User type is required' });
+        }
+        
+        // Validate user type
+        const validUserTypes = Object.values(userModel.USER_TYPES);
+        if (!validUserTypes.includes(user_type)) {
+            return res.status(400).json({ 
+                message: `Invalid user type. Must be one of: ${validUserTypes.join(', ')}` 
+            });
+        }
+        
+        // Check if user exists
+        const existingUser = await userModel.findById(id);
+        if (!existingUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Update user type
+        const { rows } = await query(
+            'UPDATE users SET user_type = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+            [user_type, id]
+        );
+        
+        // Don't send sensitive information
+        const { password, refreshToken, ...userInfo } = rows[0];
+        res.json(userInfo);
+    } catch (error) {
+        console.error('Error updating user type:', error);
         res.status(500).json({ message: error.message });
     }
 });

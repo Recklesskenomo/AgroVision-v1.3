@@ -7,7 +7,32 @@ export const ROLES = {
     MANAGER: 'manager',
     FIELD_WORKER: 'field_worker',
     DATA_ANALYST: 'data_analyst',
-    USER: 'user'
+    USER: 'user',
+    CONSULTANT: 'consultant', // External consultant (vets/agronomists)
+    DEPARTMENT_MANAGER: 'department_manager' // Department manager
+};
+
+// Define user types
+export const USER_TYPES = {
+    INTERNAL: 'internal', // Regular employee
+    EXTERNAL: 'external', // External consultant
+    ADMIN: 'admin' // Administrator
+};
+
+// Define departments
+export const DEPARTMENTS = {
+    // Administration
+    ADMINISTRATION: 'administration',
+    LOGISTICS: 'logistics',
+    SALES: 'sales',
+    MAINTENANCE: 'maintenance',
+    HR: 'hr',
+    
+    // Animals
+    ANIMALS: 'animals',
+    
+    // Feed
+    FEED: 'feed'
 };
 
 const AuthContext = createContext(null);
@@ -65,6 +90,18 @@ export const AuthProvider = ({ children }) => {
         return roles.includes(user.role);
     };
     
+    // Check if user belongs to a specific department
+    const inDepartment = (departmentId) => {
+        if (!user) return false;
+        return user.department_id === departmentId;
+    };
+    
+    // Check if user belongs to any of the specified departments
+    const inAnyDepartment = (departmentIds) => {
+        if (!user || !user.department_id) return false;
+        return departmentIds.includes(user.department_id);
+    };
+    
     // Check if user is an admin
     const isAdmin = () => {
         return hasRole(ROLES.ADMIN);
@@ -72,7 +109,18 @@ export const AuthProvider = ({ children }) => {
     
     // Check if user is a manager
     const isManager = () => {
-        return hasRole(ROLES.MANAGER);
+        return hasRole(ROLES.MANAGER) || hasRole(ROLES.DEPARTMENT_MANAGER);
+    };
+    
+    // Check if user is a consultant
+    const isConsultant = () => {
+        return hasRole(ROLES.CONSULTANT);
+    };
+    
+    // Check if user is an external user
+    const isExternal = () => {
+        if (!user) return false;
+        return user.user_type === USER_TYPES.EXTERNAL;
     };
 
     // Don't render children until authentication is initialized
@@ -91,9 +139,15 @@ export const AuthProvider = ({ children }) => {
             loading,
             hasRole,
             hasAnyRole,
+            inDepartment,
+            inAnyDepartment,
             isAdmin,
             isManager,
-            ROLES
+            isConsultant,
+            isExternal,
+            ROLES,
+            USER_TYPES,
+            DEPARTMENTS
         }}>
             {children}
         </AuthContext.Provider>

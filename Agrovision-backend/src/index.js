@@ -4,8 +4,10 @@ import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/authRoutes.js';
 import animalRoutes from './routes/animalRoute.js';
+import departmentRoutes from './routes/departmentRoutes.js';
 import { testConnection, query } from './config/database.js';
 import { initializeUserTable } from './models/userModel.js';
+import { initializeDepartmentTable } from './models/departmentModel.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -33,6 +35,7 @@ app.use(cookieParser());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', animalRoutes);
+app.use('/api/departments', departmentRoutes);
 
 // Test route
 app.get('/api/health', (req, res) => {
@@ -42,6 +45,9 @@ app.get('/api/health', (req, res) => {
 // Initialize database tables
 async function initializeTables() {
     try {
+        // Initialize departments table first (since users reference departments)
+        await initializeDepartmentTable();
+        
         // Initialize users table
         await initializeUserTable();
 
