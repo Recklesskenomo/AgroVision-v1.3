@@ -58,96 +58,123 @@ export default function UserModalForm({ isOpen, onClose, mode, onSubmit, userDat
     return (
         <dialog id="user_modal" className="modal" open={isOpen}>
             <div className="modal-box max-w-2xl">
-                <h3 className="font-bold text-lg py-4">{mode === 'edit' ? 'Edit User' : 'Add New User'}</h3>
-                <form method="dialog" onSubmit={handleSubmit}>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-lg">{mode === 'edit' ? 'Edit User' : 'Add New User'}</h3>
+                    <button className="btn btn-sm btn-circle btn-ghost" onClick={onClose}>✕</button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <label className="input input-bordered flex items-center gap-2">
-                            Username
+                        {/* Username */}
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text">Username</span>
+                            </label>
                             <input
                                 type="text"
                                 name="username"
-                                className="grow"
+                                className="input input-bordered w-full"
                                 value={formData.username}
                                 onChange={handleChange}
                                 required
+                                placeholder="Enter username"
                             />
-                        </label>
+                        </div>
 
-                        <label className="input input-bordered flex items-center gap-2">
-                            Email
+                        {/* Email */}
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text">Email</span>
+                            </label>
                             <input
                                 type="email"
                                 name="email"
-                                className="grow"
+                                className="input input-bordered w-full"
                                 value={formData.email}
                                 onChange={handleChange}
                                 required
+                                placeholder="Enter email"
                             />
-                        </label>
+                        </div>
 
-                        <label className="input input-bordered flex items-center gap-2">
-                            Password
+                        {/* Password */}
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text">Password</span>
+                                {mode === 'edit' && (
+                                    <span className="label-text-alt">Leave blank to keep current</span>
+                                )}
+                            </label>
                             <input
                                 type="password"
                                 name="password"
-                                className="grow"
+                                className="input input-bordered w-full"
                                 value={formData.password}
                                 onChange={handleChange}
                                 required={mode === 'add'}
-                                placeholder={mode === 'edit' ? 'Leave blank to keep current' : ''}
+                                placeholder={mode === 'edit' ? '••••••••' : 'Enter password'}
                             />
-                        </label>
+                        </div>
 
-                        <label className="input input-bordered flex items-center gap-2">
-                            Role
+                        {/* Role */}
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text">Role</span>
+                            </label>
                             <select
                                 name="role"
-                                className="grow bg-transparent border-none focus:outline-none"
+                                className="select select-bordered w-full"
                                 value={formData.role}
                                 onChange={handleChange}
                                 required
                             >
                                 {Object.entries(ROLES).map(([key, value]) => (
-                                    <option key={key} value={value} className="bg-base-100">
+                                    <option key={key} value={value}>
                                         {key.charAt(0) + key.slice(1).toLowerCase().replace('_', ' ')}
                                     </option>
                                 ))}
                             </select>
-                        </label>
+                        </div>
 
-                        <label className="input input-bordered flex items-center gap-2">
-                            User Type
+                        {/* User Type */}
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text">User Type</span>
+                            </label>
                             <select
                                 name="user_type"
-                                className="grow bg-transparent border-none focus:outline-none"
+                                className="select select-bordered w-full"
                                 value={formData.user_type}
                                 onChange={handleChange}
                                 required
                             >
                                 {Object.entries(USER_TYPES).map(([key, value]) => (
-                                    <option key={key} value={value} className="bg-base-100">
+                                    <option key={key} value={value}>
                                         {key.charAt(0) + key.slice(1).toLowerCase()}
                                     </option>
                                 ))}
                             </select>
-                        </label>
+                        </div>
 
-                        <label className="input input-bordered flex items-center gap-2">
-                            Department
+                        {/* Department */}
+                        <div className="form-control">
+                            <label className="label">
+                                <span className="label-text">Department</span>
+                            </label>
                             <select
                                 name="department_id"
-                                className="grow bg-transparent border-none focus:outline-none"
+                                className="select select-bordered w-full"
                                 value={formData.department_id || ''}
                                 onChange={handleChange}
                             >
-                                <option value="" className="bg-base-100">None</option>
+                                <option value="">None</option>
                                 {departments.map(dept => (
-                                    <option key={dept.id} value={dept.id} className="bg-base-100">
+                                    <option key={dept.id} value={dept.id}>
                                         {dept.name.charAt(0).toUpperCase() + dept.name.slice(1)}
                                     </option>
                                 ))}
                             </select>
-                        </label>
+                        </div>
                     </div>
 
                     <div className="modal-action">
@@ -158,6 +185,9 @@ export default function UserModalForm({ isOpen, onClose, mode, onSubmit, userDat
                     </div>
                 </form>
             </div>
+            <form method="dialog" className="modal-backdrop">
+                <button onClick={onClose}>close</button>
+            </form>
         </dialog>
     );
 } 

@@ -23,6 +23,11 @@ const UserManagement = () => {
     const { isAdmin, ROLES, USER_TYPES } = useAuth();
     const navigate = useNavigate();
 
+    // Function to capitalize first letter
+    const capitalize = (str) => {
+        return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+    };
+
     // Redirect non-admin users
     useEffect(() => {
         if (!isAdmin()) {
@@ -178,7 +183,10 @@ const UserManagement = () => {
                 <div className="max-w-6xl mx-auto">
                     <div className="bg-base-100 shadow-xl rounded-lg p-6">
                         <div className="flex justify-between items-center mb-6">
-                            <h1 className="text-3xl font-bold">User Management</h1>
+                            <div>
+                                <h1 className="text-3xl font-bold">User Management</h1>
+                                <p className="text-gray-600 mt-1">Manage system users and their roles</p>
+                            </div>
                             <button 
                                 onClick={() => {
                                     setModalMode('add');
@@ -191,19 +199,33 @@ const UserManagement = () => {
                             </button>
                         </div>
 
-                        <div className="mb-4">
-                            <input
-                                type="text"
-                                placeholder="Search users..."
-                                className="input input-bordered w-full max-w-xs"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                        <div className="mb-6">
+                            <div className="flex gap-4 items-center">
+                                <div className="form-control w-full max-w-xs">
+                                    <div className="input-group">
+                                        <input
+                                            type="text"
+                                            placeholder="Search users..."
+                                            className="input input-bordered w-full"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                        <button className="btn btn-square btn-primary">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {error && (
                             <div className="alert alert-error mb-4">
-                                {error}
+                                <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>{error}</span>
                             </div>
                         )}
 
@@ -212,30 +234,30 @@ const UserManagement = () => {
                                 <span className="loading loading-spinner loading-lg"></span>
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="table">
+                            <div className="overflow-x-auto bg-base-100 rounded-lg">
+                                <table className="table table-zebra">
                                     <thead>
                                         <tr>
-                                            <th></th>
-                                            <th>ID</th>
-                                            <th>Username</th>
-                                            <th>Email</th>
-                                            <th>Role</th>
-                                            <th>Department</th>
-                                            <th>User Type</th>
-                                            <th>Actions</th>
+                                            <th className="bg-base-200"></th>
+                                            <th className="bg-base-200">ID</th>
+                                            <th className="bg-base-200">Username</th>
+                                            <th className="bg-base-200">Email</th>
+                                            <th className="bg-base-200">Role</th>
+                                            <th className="bg-base-200">Department</th>
+                                            <th className="bg-base-200">User Type</th>
+                                            <th className="bg-base-200">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="hover">
+                                    <tbody>
                                         {filteredUsers.map((user) => (
-                                            <tr key={user.id}>
+                                            <tr key={user.id} className="hover">
                                                 <th></th>
-                                                <th>{user.id}</th>
+                                                <td>{user.id}</td>
                                                 <td>{user.username}</td>
                                                 <td>{user.email}</td>
-                                                <td>{user.role}</td>
+                                                <td>{capitalize(user.role.replace('_', ' '))}</td>
                                                 <td>{getDepartmentName(user.department_id)}</td>
-                                                <td>{user.user_type}</td>
+                                                <td>{capitalize(user.user_type)}</td>
                                                 <td>
                                                     <div className="flex gap-2">
                                                         <button 
@@ -246,6 +268,9 @@ const UserManagement = () => {
                                                             }}
                                                             className="btn btn-secondary btn-sm"
                                                         >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                            </svg>
                                                             Edit
                                                         </button>
                                                         
@@ -269,6 +294,9 @@ const UserManagement = () => {
                                                                 className="btn btn-error btn-sm"
                                                                 onClick={() => setDeleteId(user.id)}
                                                             >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                </svg>
                                                                 Delete
                                                             </button>
                                                         )}
