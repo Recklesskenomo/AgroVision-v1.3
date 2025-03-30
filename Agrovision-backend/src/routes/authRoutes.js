@@ -345,4 +345,25 @@ router.put('/users/:id/usertype', auth, isAdmin, async (req, res) => {
     }
 });
 
+// Admin: Delete user
+router.delete('/users/:id', auth, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Check if user exists
+        const existingUser = await userModel.findById(id);
+        if (!existingUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Delete user
+        await query('DELETE FROM users WHERE id = $1', [id]);
+        
+        res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
 export default router; 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { AdminOnly } from '../components/RoleBasedAccess';
+import UserModalForm from '../components/UserModalForm';
 
 const API_URL = 'http://localhost:3000/api/auth';
 const DEPT_API_URL = 'http://localhost:3000/api/departments';
@@ -13,14 +14,12 @@ const UserManagement = () => {
     const [loading, setLoading] = useState(true);
     const [departmentsLoading, setDepartmentsLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [newUserData, setNewUserData] = useState({
-        username: '',
-        email: '',
-        password: '',
-        role: 'user',
-        department_id: '',
-        user_type: 'internal'
-    });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [deleteId, setDeleteId] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalMode, setModalMode] = useState('add');
+    const [selectedUser, setSelectedUser] = useState(null);
+    
     const { isAdmin, ROLES, USER_TYPES } = useAuth();
     const navigate = useNavigate();
 
@@ -32,26 +31,26 @@ const UserManagement = () => {
     }, [isAdmin, navigate]);
 
     // Fetch all users
-    useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                setLoading(true);
-                const response = await axios.get(`${API_URL}/users`, {
-                    withCredentials: true,
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                    }
-                });
-                setUsers(response.data);
-                setError(null);
-            } catch (error) {
-                console.error('Error fetching users:', error);
-                setError('Failed to load users. Please try again.');
-            } finally {
-                setLoading(false);
-            }
-        };
+    const fetchUsers = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.get(`${API_URL}/users`, {
+                withCredentials: true,
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+            setUsers(response.data);
+            setError(null);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            setError('Failed to load users. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         fetchUsers();
     }, []);
     
@@ -77,128 +76,92 @@ const UserManagement = () => {
         fetchDepartments();
     }, []);
 
-    // Handle role change
-    const handleRoleChange = async (userId, newRole) => {
-        try {
-            const response = await axios.put(`${API_URL}/users/${userId}/role`, 
-                { role: newRole }, 
-                { 
-                    withCredentials: true,
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                    }
-                }
-            );
-            
-            // Update users list with the updated user
-            setUsers(users.map(user => 
-                user.id === userId ? { ...user, role: response.data.role } : user
-            ));
-            
-            setError(null);
-        } catch (error) {
-            console.error('Error updating role:', error);
-            setError('Failed to update user role. Please try again.');
-        }
-    };
-    
-    // Handle department change
-    const handleDepartmentChange = async (userId, departmentId) => {
-        try {
-            const response = await axios.put(`${API_URL}/users/${userId}/department`, 
-                { department_id: departmentId || null }, 
-                { 
-                    withCredentials: true,
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                    }
-                }
-            );
-            
-            // Update users list with the updated user
-            setUsers(users.map(user => 
-                user.id === userId ? { ...user, department_id: response.data.department_id } : user
-            ));
-            
-            setError(null);
-        } catch (error) {
-            console.error('Error updating department:', error);
-            setError('Failed to update user department. Please try again.');
-        }
-    };
-    
-    // Handle user type change
-    const handleUserTypeChange = async (userId, userType) => {
-        try {
-            const response = await axios.put(`${API_URL}/users/${userId}/usertype`, 
-                { user_type: userType }, 
-                { 
-                    withCredentials: true,
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                    }
-                }
-            );
-            
-            // Update users list with the updated user
-            setUsers(users.map(user => 
-                user.id === userId ? { ...user, user_type: response.data.user_type } : user
-            ));
-            
-            setError(null);
-        } catch (error) {
-            console.error('Error updating user type:', error);
-            setError('Failed to update user type. Please try again.');
-        }
-    };
+    // Filter users based on search term
+    const filteredUsers = users.filter(user =>
+        user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.department_name && user.department_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
 
-    // Handle new user form input change
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setNewUserData({
-            ...newUserData,
-            [name]: value
-        });
-    };
-
-    // Handle new user creation
-    const handleCreateUser = async (e) => {
-        e.preventDefault();
+    // Handle form submission
+    const handleSubmit = async (userData) => {
         try {
-            const userData = { ...newUserData };
-            
-            // Convert empty department_id to null
-            if (userData.department_id === '') {
-                userData.department_id = null;
+            if (modalMode === 'add') {
+                const response = await axios.post(`${API_URL}/users`, userData, {
+                    withCredentials: true,
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                    }
+                });
+                setUsers([...users, response.data]);
+            } else {
+                // Update user data one by one using specific endpoints
+                if (userData.role !== selectedUser.role) {
+                    await axios.put(`${API_URL}/users/${selectedUser.id}/role`, 
+                        { role: userData.role },
+                        {
+                            withCredentials: true,
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                            }
+                        }
+                    );
+                }
+
+                if (userData.department_id !== selectedUser.department_id) {
+                    await axios.put(`${API_URL}/users/${selectedUser.id}/department`,
+                        { department_id: userData.department_id },
+                        {
+                            withCredentials: true,
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                            }
+                        }
+                    );
+                }
+
+                if (userData.user_type !== selectedUser.user_type) {
+                    await axios.put(`${API_URL}/users/${selectedUser.id}/usertype`,
+                        { user_type: userData.user_type },
+                        {
+                            withCredentials: true,
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                            }
+                        }
+                    );
+                }
             }
-            
-            const response = await axios.post(`${API_URL}/users`, 
-                userData, 
-                { 
-                    withCredentials: true,
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                    }
-                }
-            );
-            
-            // Add new user to the list
-            setUsers([...users, response.data]);
-            
-            // Reset form
-            setNewUserData({
-                username: '',
-                email: '',
-                password: '',
-                role: 'user',
-                department_id: '',
-                user_type: 'internal'
-            });
-            
+            setIsModalOpen(false);
+            setSelectedUser(null);
             setError(null);
+            // Refresh the users list
+            fetchUsers();
         } catch (error) {
-            console.error('Error creating user:', error);
-            setError(error.response?.data?.message || 'Failed to create user. Please try again.');
+            console.error('Error handling user:', error);
+            setError(error.response?.data?.message || 'Failed to process user. Please try again.');
+        }
+    };
+
+    // Handle delete user
+    const handleDelete = async (id) => {
+        try {
+            // Using the correct endpoint for deleting users
+            await axios.delete(`${API_URL}/users/${id}`, {
+                withCredentials: true,
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+            });
+            setUsers(users.filter(user => user.id !== id));
+            setDeleteId(null);
+            setError(null);
+            // Refresh the users list to ensure we have the latest data
+            fetchUsers();
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            setError('Failed to delete user. Please try again.');
         }
     };
 
@@ -211,222 +174,127 @@ const UserManagement = () => {
 
     return (
         <AdminOnly fallback={<div className="p-4">You don't have permission to access this page.</div>}>
-            <div className="container mx-auto p-4">
-                <h1 className="text-2xl font-bold mb-6">User Management</h1>
-                
-                {/* Error message */}
-                {error && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                        {error}
-                    </div>
-                )}
-                
-                {/* Create new user form */}
-                <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-                    <h2 className="text-xl font-semibold mb-4">Create New User</h2>
-                    <form onSubmit={handleCreateUser}>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-gray-700 mb-2">Username</label>
-                                <input
-                                    type="text"
-                                    name="username"
-                                    value={newUserData.username}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-md"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-700 mb-2">Email</label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={newUserData.email}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-md"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-700 mb-2">Password</label>
-                                <input
-                                    type="password"
-                                    name="password"
-                                    value={newUserData.password}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-md"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-gray-700 mb-2">Role</label>
-                                <select
-                                    name="role"
-                                    value={newUserData.role}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-md"
-                                    required
-                                >
-                                    {Object.entries(ROLES).map(([key, value]) => (
-                                        <option key={key} value={value}>
-                                            {key.charAt(0) + key.slice(1).toLowerCase().replace('_', ' ')}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-gray-700 mb-2">Department</label>
-                                <select
-                                    name="department_id"
-                                    value={newUserData.department_id}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-md"
-                                >
-                                    <option value="">None</option>
-                                    {departments.map(dept => (
-                                        <option key={dept.id} value={dept.id}>
-                                            {dept.name.charAt(0).toUpperCase() + dept.name.slice(1)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-gray-700 mb-2">User Type</label>
-                                <select
-                                    name="user_type"
-                                    value={newUserData.user_type}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-md"
-                                    required
-                                >
-                                    {Object.entries(USER_TYPES).map(([key, value]) => (
-                                        <option key={key} value={value}>
-                                            {key.charAt(0) + key.slice(1).toLowerCase()}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+            <div className="p-6">
+                <div className="max-w-6xl mx-auto">
+                    <div className="bg-base-100 shadow-xl rounded-lg p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h1 className="text-3xl font-bold">User Management</h1>
+                            <button 
+                                onClick={() => {
+                                    setModalMode('add');
+                                    setSelectedUser(null);
+                                    setIsModalOpen(true);
+                                }}
+                                className="btn btn-primary"
+                            >
+                                Add New User
+                            </button>
                         </div>
-                        <button
-                            type="submit"
-                            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                            Create User
-                        </button>
-                    </form>
-                </div>
-                
-                {/* Users list */}
-                <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                    <h2 className="text-xl font-semibold p-6 border-b">Users</h2>
-                    
-                    {loading ? (
-                        <div className="p-6 text-center">
-                            <span className="loading loading-spinner loading-md"></span>
-                            <span className="ml-2">Loading users...</span>
+
+                        <div className="mb-4">
+                            <input
+                                type="text"
+                                placeholder="Search users..."
+                                className="input input-bordered w-full max-w-xs"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
                         </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            ID
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Username
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Email
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Role
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Department
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            User Type
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Created At
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {users.map(user => (
-                                        <tr key={user.id}>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {user.id}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm font-medium text-gray-900">
-                                                    {user.username}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-500">
-                                                    {user.email}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-500">
-                                                    <select
-                                                        value={user.role}
-                                                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                                                        className="border rounded-md px-2 py-1"
-                                                    >
-                                                        {Object.entries(ROLES).map(([key, value]) => (
-                                                            <option key={key} value={value}>
-                                                                {key.charAt(0) + key.slice(1).toLowerCase().replace('_', ' ')}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-500">
-                                                    <select
-                                                        value={user.department_id || ''}
-                                                        onChange={(e) => handleDepartmentChange(user.id, e.target.value)}
-                                                        className="border rounded-md px-2 py-1"
-                                                    >
-                                                        <option value="">None</option>
-                                                        {departments.map(dept => (
-                                                            <option key={dept.id} value={dept.id}>
-                                                                {dept.name.charAt(0).toUpperCase() + dept.name.slice(1)}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-500">
-                                                    <select
-                                                        value={user.user_type || 'internal'}
-                                                        onChange={(e) => handleUserTypeChange(user.id, e.target.value)}
-                                                        className="border rounded-md px-2 py-1"
-                                                    >
-                                                        {Object.entries(USER_TYPES).map(([key, value]) => (
-                                                            <option key={key} value={value}>
-                                                                {key.charAt(0) + key.slice(1).toLowerCase()}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {new Date(user.createdAt).toLocaleDateString()}
-                                            </td>
+
+                        {error && (
+                            <div className="alert alert-error mb-4">
+                                {error}
+                            </div>
+                        )}
+
+                        {loading ? (
+                            <div className="flex justify-center items-center p-8">
+                                <span className="loading loading-spinner loading-lg"></span>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>ID</th>
+                                            <th>Username</th>
+                                            <th>Email</th>
+                                            <th>Role</th>
+                                            <th>Department</th>
+                                            <th>User Type</th>
+                                            <th>Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                    </thead>
+                                    <tbody className="hover">
+                                        {filteredUsers.map((user) => (
+                                            <tr key={user.id}>
+                                                <th></th>
+                                                <th>{user.id}</th>
+                                                <td>{user.username}</td>
+                                                <td>{user.email}</td>
+                                                <td>{user.role}</td>
+                                                <td>{getDepartmentName(user.department_id)}</td>
+                                                <td>{user.user_type}</td>
+                                                <td>
+                                                    <div className="flex gap-2">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setModalMode('edit');
+                                                                setSelectedUser(user);
+                                                                setIsModalOpen(true);
+                                                            }}
+                                                            className="btn btn-secondary btn-sm"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        
+                                                        {deleteId === user.id ? (
+                                                            <div className="join">
+                                                                <button 
+                                                                    className="btn btn-error btn-sm join-item"
+                                                                    onClick={() => handleDelete(user.id)}
+                                                                >
+                                                                    Confirm
+                                                                </button>
+                                                                <button 
+                                                                    className="btn btn-sm join-item"
+                                                                    onClick={() => setDeleteId(null)}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <button 
+                                                                className="btn btn-error btn-sm"
+                                                                onClick={() => setDeleteId(user.id)}
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
+
+            <UserModalForm
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setSelectedUser(null);
+                }}
+                mode={modalMode}
+                onSubmit={handleSubmit}
+                userData={selectedUser}
+                departments={departments}
+            />
         </AdminOnly>
     );
 };
