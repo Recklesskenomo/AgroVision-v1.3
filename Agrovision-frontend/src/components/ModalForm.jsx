@@ -7,7 +7,7 @@ export default function ModalForm({ isOpen , onClose, mode, OnSubmit,animalData}
     const [age, setAge] = useState('');
     const [use, setUse] = useState('');
     const [status, setStatus] = useState(false);
-    
+
     // Additional fields based on species
     const [weight, setWeight] = useState('');
     const [milkProduction, setMilkProduction] = useState('');
@@ -356,7 +356,7 @@ export default function ModalForm({ isOpen , onClose, mode, OnSubmit,animalData}
                                 >
                                     <option className="bg-base-100">Inactive</option>
                                     <option className="bg-base-100">Active</option>
-                                </select>
+                            </select>
                             </label>
                         </div>
 

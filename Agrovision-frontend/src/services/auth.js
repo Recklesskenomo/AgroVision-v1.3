@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+const API_URL = 'http://localhost:3000/api/auth';
+
 // Token management
 const setAuthToken = (token) => {
     if (token) {
@@ -12,53 +14,94 @@ const setAuthToken = (token) => {
 class AuthService {
     async register(username, email, password) {
         try {
-            const response = await axios.post('/auth/register', {
+            console.log('Sending registration request:', { username, email });
+            const response = await axios.post(`${API_URL}/register`, {
                 username,
                 email,
                 password
+            }, {
+                withCredentials: true
             });
-            if (response.data.accessToken) {
-                localStorage.setItem('user', JSON.stringify(response.data));
+            
+            console.log('Registration successful:', response.data);
+            const { accessToken } = response.data;
+            
+            if (accessToken) {
+                localStorage.setItem('accessToken', accessToken);
+                setAuthToken(accessToken);
+                localStorage.setItem('user', JSON.stringify(response.data.user));
             }
+            
             return response.data;
         } catch (error) {
-            console.error('Auth service register error:', error.response || error);
-            throw error;
+            console.error('Registration error:', error.response?.data || error.message);
+            throw error.response?.data || error;
         }
     }
 
     async login(email, password) {
-        const response = await axios.post('/auth/login', {
-            email,
-            password
-        });
-        const { accessToken } = response.data;
-        localStorage.setItem('accessToken', accessToken);
-        setAuthToken(accessToken);
-        return response.data;
+        try {
+            console.log('Sending login request:', { email });
+            const response = await axios.post(`${API_URL}/login`, {
+                email,
+                password
+            }, {
+                withCredentials: true
+            });
+            
+            console.log('Login successful:', response.data);
+            const { accessToken } = response.data;
+            
+            if (accessToken) {
+                localStorage.setItem('accessToken', accessToken);
+                setAuthToken(accessToken);
+                localStorage.setItem('user', JSON.stringify(response.data.user));
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('Login error:', error.response?.data || error.message);
+            throw error.response?.data || error;
+        }
     }
 
     async refreshToken() {
         try {
-            const response = await axios.post('/auth/refresh-token');
+            const response = await axios.post(`${API_URL}/refresh-token`, {}, {
+                withCredentials: true
+            });
             const { accessToken } = response.data;
             localStorage.setItem('accessToken', accessToken);
             setAuthToken(accessToken);
             return accessToken;
         } catch (error) {
             this.logout();
-            throw error;
+            console.error('Token refresh error:', error.response?.data || error.message);
+            throw error.response?.data || error;
         }
     }
 
-    logout() {
-        localStorage.removeItem('accessToken');
-        setAuthToken(null);
+    async logout() {
+        try {
+            await axios.post(`${API_URL}/logout`, {}, {
+                withCredentials: true
+            });
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('user');
+            setAuthToken(null);
+        } catch (error) {
+            console.error('Logout error:', error.response?.data || error.message);
+        } finally {
+            // Always clear local storage even if API request fails
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('user');
+            setAuthToken(null);
+        }
     }
 
     getCurrentUser() {
-        const token = localStorage.getItem('accessToken');
-        return token ? JSON.parse(atob(token.split('.')[1])) : null;
+        const user = localStorage.getItem('user');
+        return user ? JSON.parse(user) : null;
     }
 }
 

@@ -5,10 +5,15 @@ export const getAnimals = async() => {
     return rows;
 }
 
+export const getAnimalById = async(id) => {
+    const {rows} = await query('SELECT * FROM animals WHERE id = $1', [id]);
+    return rows[0];
+}
+
 export const createAnimal = async (animalData) => {
     try {
-        console.log('Processing animal data in service:', animalData); // Debug log
-
+        console.log('Processing animal data in service:', animalData);
+        
         const {
             name,
             species,
@@ -23,13 +28,10 @@ export const createAnimal = async (animalData) => {
             lastVaccination
         } = animalData;
 
-        // Validate required fields
-        if (!name || !species || !breed || !age || !use) {
-            throw new Error('Missing required fields');
-        }
+        const is_active = status === true || status === 'true' ? true : false;
 
-        const { rows } = await query(
-            `INSERT INTO animals (
+        const sql = `
+            INSERT INTO animals (
                 name, 
                 species, 
                 breed, 
@@ -40,25 +42,30 @@ export const createAnimal = async (animalData) => {
                 milk_production, 
                 wool_type, 
                 egg_production, 
-                last_vaccination
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
-            RETURNING *`,
-            [
-                name,
-                species,
-                breed,
-                parseInt(age),
-                use,
-                status || false, // Default to false if not provided
-                weight ? parseFloat(weight) : null,
-                milkProduction ? parseFloat(milkProduction) : null,
-                woolType || null,
-                eggProduction ? parseInt(eggProduction) : null,
-                lastVaccination || null
-            ]
-        );
+                last_vaccination, 
+                "createdAt", 
+                "updatedAt"
+            ) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+            RETURNING *
+        `;
 
-        console.log('Successfully created animal:', rows[0]); // Debug log
+        const values = [
+            name,
+            species,
+            breed,
+            age,
+            use,
+            is_active,
+            weight ? parseFloat(weight) : null,
+            milkProduction ? parseFloat(milkProduction) : null,
+            woolType || null,
+            eggProduction ? parseInt(eggProduction) : null,
+            lastVaccination || null
+        ];
+
+        console.log('Executing SQL with values:', values);
+        const { rows } = await query(sql, values);
         return rows[0];
     } catch (error) {
         console.error('Error in createAnimal service:', error);
@@ -66,23 +73,75 @@ export const createAnimal = async (animalData) => {
     }
 };
 
-export const updateAnimal = async (animalId, animalData) => {
-    const { name, species, breed, age, use, status } = animalData;
-    const is_active = status; // Map status to is_active
+export const updateAnimal = async (id, animalData) => {
+    try {
+        const {
+            name,
+            species,
+            breed,
+            age,
+            use,
+            status,
+            weight,
+            milkProduction,
+            woolType,
+            eggProduction,
+            lastVaccination
+        } = animalData;
 
-    const { rows } = await query(
-        `UPDATE animals SET name = $1, species = $2, breed = $3, age = $4, is_active = $5, use = $6 
-       WHERE id = $7 RETURNING *`,
-        [name, species, breed, age, is_active, use, animalId]
-    );
+        const is_active = status === true || status === 'true' ? true : false;
 
-    return rows[0];
+        const sql = `
+            UPDATE animals 
+            SET 
+                name = $1, 
+                species = $2, 
+                breed = $3, 
+                age = $4, 
+                use = $5, 
+                is_active = $6,
+                weight = $7,
+                milk_production = $8,
+                wool_type = $9,
+                egg_production = $10,
+                last_vaccination = $11,
+                "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $12
+            RETURNING *
+        `;
+
+        const values = [
+            name,
+            species,
+            breed,
+            age,
+            use,
+            is_active,
+            weight ? parseFloat(weight) : null,
+            milkProduction ? parseFloat(milkProduction) : null,
+            woolType || null,
+            eggProduction ? parseInt(eggProduction) : null,
+            lastVaccination || null,
+            id
+        ];
+
+        console.log('Executing UPDATE with values:', values);
+        const { rows } = await query(sql, values);
+        return rows[0];
+    } catch (error) {
+        console.error('Error in updateAnimal service:', error);
+        throw error;
+    }
 };
 
-
-export const deleteAnimal = async (animalId) => {
-    const { rowCount } = await query(`DELETE FROM animals WHERE id = $1`, [animalId]);
-    return rowCount > 0; // Returns true if a row was deleted, false otherwise
+export const deleteAnimal = async (id) => {
+    try {
+        const { rows } = await query('DELETE FROM animals WHERE id = $1 RETURNING *', [id]);
+        return rows[0];
+    } catch (error) {
+        console.error('Error in deleteAnimal service:', error);
+        throw error;
+    }
 };
 
 export const searchAnimals = async (searchTerm) => {

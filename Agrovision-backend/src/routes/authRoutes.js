@@ -1,221 +1,159 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import { body, validationResult } from 'express-validator';
-import User from '../models/userModel.js';
+import * as userModel from '../models/userModel.js';
 import { auth } from '../middleware/auth.js';
-import { jwtConfig } from '../config/jwtConfig.js';
-import { Op } from 'sequelize';
 
 const router = express.Router();
 
-// Validation middleware
-const validateRegistration = [
-    body('email').isEmail().normalizeEmail(),
-    body('username').notEmpty(),
-    body('password').isLength({ min: 6 })
-];
-
 // Register
-router.post('/register', validateRegistration, async (req, res) => {
+router.post('/register', async (req, res) => {
     try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ 
-                error: 'Validation failed', 
-                details: errors.array() 
-            });
-        }
-
-        // Check if user already exists
-        const existingUser = await User.findOne({ 
-            where: { 
-                [Op.or]: [
-                    { email: req.body.email },
-                    { username: req.body.username }
-                ]
-            }
-        });
-
-        if (existingUser) {
-            return res.status(400).json({ 
-                error: 'User with this email or username already exists' 
-            });
-        }
-
+        console.log('Registration request received:', req.body);
         const { username, email, password } = req.body;
-        console.log('Attempting to create user:', { username, email }); // Debug log
+        
+        if (!username || !email || !password) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+        
+        // Check if user exists
+        const existingUser = await userModel.findByEmail(email);
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email already registered' });
+        }
 
-        const user = await User.create({ username, email, password });
-        console.log('User created:', user.id); // Debug log
+        // Create new user
+        const user = await userModel.createUser({ username, email, password });
+        console.log('User created:', user);
         
         const accessToken = jwt.sign(
-            { userId: user.id, role: user.role }, 
-            jwtConfig.secret, 
-            { expiresIn: jwtConfig.accessTokenExpiry }
+            { userId: user.id }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '15m' }
         );
-
+        
         const refreshToken = jwt.sign(
-            { userId: user.id },
-            jwtConfig.refreshSecret,
-            { expiresIn: jwtConfig.refreshTokenExpiry }
+            { userId: user.id }, 
+            process.env.JWT_REFRESH_SECRET, 
+            { expiresIn: '7d' }
         );
+        
+        await userModel.updateRefreshToken(user.id, refreshToken);
 
-        user.refreshToken = refreshToken;
-        await user.save();
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
 
-        res.status(201).json({ 
+        res.status(201).json({
             user: {
                 id: user.id,
                 username: user.username,
-                email: user.email,
-                role: user.role
+                email: user.email
             },
-            accessToken,
-            refreshToken
+            accessToken
         });
     } catch (error) {
-        console.error('Registration error:', error); // Debug log
-        res.status(400).json({ 
-            error: error.message || 'Registration failed',
-            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
+        console.error('Registration error:', error);
+        res.status(400).json({ message: error.message });
     }
 });
 
 // Login
 router.post('/login', async (req, res) => {
     try {
+        console.log('Login request received:', req.body);
         const { email, password } = req.body;
-        const user = await User.findOne({ where: { email } });
         
-        if (!user || !(await user.comparePassword(password))) {
-            throw new Error('Invalid login credentials');
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
+        
+        const user = await userModel.findByEmail(email);
+        
+        if (!user || !(await userModel.comparePassword(password, user.password))) {
+            return res.status(401).json({ message: 'Invalid login credentials' });
         }
 
         const accessToken = jwt.sign(
-            { userId: user.id, role: user.role }, 
-            jwtConfig.secret, 
-            { expiresIn: jwtConfig.accessTokenExpiry }
+            { userId: user.id }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '15m' }
         );
-
+        
         const refreshToken = jwt.sign(
-            { userId: user.id },
-            jwtConfig.refreshSecret,
-            { expiresIn: jwtConfig.refreshTokenExpiry }
+            { userId: user.id }, 
+            process.env.JWT_REFRESH_SECRET, 
+            { expiresIn: '7d' }
         );
+        
+        await userModel.updateRefreshToken(user.id, refreshToken);
 
-        // Store refresh token in database
-        user.refreshToken = refreshToken;
-        await user.save();
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
 
-        res.json({ 
+        res.json({
             user: {
                 id: user.id,
                 username: user.username,
-                email: user.email,
-                role: user.role
+                email: user.email
             },
-            accessToken,
-            refreshToken
+            accessToken
         });
     } catch (error) {
-        res.status(401).json({ error: error.message });
+        console.error('Login error:', error);
+        res.status(401).json({ message: error.message });
     }
 });
 
 // Refresh Token
 router.post('/refresh-token', async (req, res) => {
     try {
-        const { refreshToken } = req.body;
-        
+        const refreshToken = req.cookies.refreshToken;
         if (!refreshToken) {
-            throw new Error('Refresh token is required');
+            return res.status(401).json({ message: 'No refresh token' });
         }
 
-        // Verify refresh token
-        const decoded = jwt.verify(refreshToken, jwtConfig.refreshSecret);
-        
-        // Find user with valid refresh token
-        const user = await User.findOne({ 
-            where: { 
-                id: decoded.userId,
-                refreshToken: refreshToken
-            }
-        });
+        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        const user = await userModel.findById(decoded.userId);
 
-        if (!user) {
-            throw new Error('Invalid refresh token');
+        if (!user || user.refreshToken !== refreshToken) {
+            return res.status(401).json({ message: 'Invalid refresh token' });
         }
 
-        // Generate new access token
         const accessToken = jwt.sign(
-            { userId: user.id, role: user.role },
-            jwtConfig.secret,
-            { expiresIn: jwtConfig.accessTokenExpiry }
+            { userId: user.id }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '15m' }
         );
 
-        // Generate new refresh token
-        const newRefreshToken = jwt.sign(
-            { userId: user.id },
-            jwtConfig.refreshSecret,
-            { expiresIn: jwtConfig.refreshTokenExpiry }
-        );
-
-        // Update refresh token in database
-        user.refreshToken = newRefreshToken;
-        await user.save();
-
-        res.json({ 
-            accessToken,
-            refreshToken: newRefreshToken
-        });
+        res.json({ accessToken });
     } catch (error) {
-        res.status(401).json({ error: 'Invalid refresh token' });
+        console.error('Token refresh error:', error);
+        res.status(401).json({ message: 'Invalid refresh token' });
     }
 });
 
 // Logout
 router.post('/logout', auth, async (req, res) => {
     try {
-        const user = await User.findByPk(req.user.userId);
-        
-        // Clear refresh token
-        user.refreshToken = null;
-        await user.save();
-        
+        await userModel.updateRefreshToken(req.user.userId, null);
+        res.clearCookie('refreshToken');
         res.json({ message: 'Logged out successfully' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Logout error:', error);
+        res.status(500).json({ message: error.message });
     }
 });
 
-// Protected route example
-router.get('/me', auth, async (req, res) => {
-    try {
-        const user = await User.findByPk(req.user.userId, {
-            attributes: ['id', 'username', 'email', 'role']
-        });
-        res.json(user);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Add this route to check if users table exists
-router.get('/test-db', async (req, res) => {
-    try {
-        const users = await User.findAll();
-        res.json({ 
-            message: 'Users table exists',
-            count: users.length,
-            users: users.map(u => ({ id: u.id, username: u.username, email: u.email }))
-        });
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Database error',
-            details: error.message
-        });
-    }
+// Protected route test
+router.get('/protected', auth, (req, res) => {
+    res.json({ message: 'This is a protected route', userId: req.user.userId });
 });
 
 export default router; 

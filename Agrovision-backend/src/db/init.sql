@@ -6,6 +6,11 @@ CREATE TABLE IF NOT EXISTS animals (
     age INTEGER,
     is_active BOOLEAN DEFAULT true,
     use VARCHAR(255),
+    weight DECIMAL,
+    milk_production DECIMAL,
+    wool_type VARCHAR(50),
+    egg_production INTEGER,
+    last_vaccination DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ); 

@@ -10,9 +10,9 @@ export const initializeUserTable = async () => {
             email VARCHAR(255) UNIQUE NOT NULL,
             password VARCHAR(255) NOT NULL,
             role VARCHAR(50) DEFAULT 'user',
-            refresh_token TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            "refreshToken" TEXT,
+            "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     `;
     
@@ -40,7 +40,7 @@ export const createUser = async (userData) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     const { rows } = await query(
-        'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING *',
+        'INSERT INTO users (username, email, password, "createdAt", "updatedAt") VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING *',
         [username, email, hashedPassword]
     );
     
@@ -49,7 +49,7 @@ export const createUser = async (userData) => {
 
 export const updateRefreshToken = async (userId, token) => {
     const { rows } = await query(
-        'UPDATE users SET refresh_token = $1 WHERE id = $2 RETURNING *',
+        'UPDATE users SET "refreshToken" = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
         [token, userId]
     );
     return rows[0];
