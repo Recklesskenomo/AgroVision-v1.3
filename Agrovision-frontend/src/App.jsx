@@ -9,6 +9,10 @@ import Register from './components/Register';
 import Contact from './components/Contact';
 import Dashboard from './components/Dashboard';
 import AnimalsPage from './pages/AnimalsPage';
+import UserManagement from './pages/UserManagement';
+import ManagerOperations from './pages/ManagerOperations';
+import FieldWorkerTasks from './pages/FieldWorkerTasks';
+import DataAnalytics from './pages/DataAnalytics';
 import './App.css';
 
 // Protected Route component
@@ -19,6 +23,74 @@ const ProtectedRoute = ({ children }) => {
     
     if (!user) {
         return <Navigate to="/login" replace />;
+    }
+
+    return children;
+};
+
+// Admin Route component (accessible only by admins)
+const AdminRoute = ({ children }) => {
+    const { user, loading, isAdmin } = useAuth();
+    
+    if (loading) return <div>Loading...</div>;
+    
+    if (!user) {
+        return <Navigate to="/login" replace />;
+    }
+    
+    if (!isAdmin()) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+};
+
+// Manager Route component (accessible only by managers)
+const ManagerRoute = ({ children }) => {
+    const { user, loading, hasRole, ROLES } = useAuth();
+    
+    if (loading) return <div>Loading...</div>;
+    
+    if (!user) {
+        return <Navigate to="/login" replace />;
+    }
+    
+    if (!hasRole(ROLES.MANAGER)) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+};
+
+// Field Worker Route component
+const FieldWorkerRoute = ({ children }) => {
+    const { user, loading, hasRole, ROLES } = useAuth();
+    
+    if (loading) return <div>Loading...</div>;
+    
+    if (!user) {
+        return <Navigate to="/login" replace />;
+    }
+    
+    if (!hasRole(ROLES.FIELD_WORKER)) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+};
+
+// Data Analyst Route component
+const DataAnalystRoute = ({ children }) => {
+    const { user, loading, hasRole, ROLES } = useAuth();
+    
+    if (loading) return <div>Loading...</div>;
+    
+    if (!user) {
+        return <Navigate to="/login" replace />;
+    }
+    
+    if (!hasRole(ROLES.DATA_ANALYST)) {
+        return <Navigate to="/dashboard" replace />;
     }
 
     return children;
@@ -81,6 +153,42 @@ function App() {
                                 <ProtectedRoute>
                                     <AnimalsPage />
                                 </ProtectedRoute>
+                            } 
+                        />
+                        {/* Admin routes */}
+                        <Route 
+                            path="/admin/users" 
+                            element={
+                                <AdminRoute>
+                                    <UserManagement />
+                                </AdminRoute>
+                            } 
+                        />
+                        {/* Manager routes */}
+                        <Route 
+                            path="/manager/operations" 
+                            element={
+                                <ManagerRoute>
+                                    <ManagerOperations />
+                                </ManagerRoute>
+                            } 
+                        />
+                        {/* Field Worker routes */}
+                        <Route 
+                            path="/field-worker/tasks" 
+                            element={
+                                <FieldWorkerRoute>
+                                    <FieldWorkerTasks />
+                                </FieldWorkerRoute>
+                            } 
+                        />
+                        {/* Data Analyst routes */}
+                        <Route 
+                            path="/data-analyst/analytics" 
+                            element={
+                                <DataAnalystRoute>
+                                    <DataAnalytics />
+                                </DataAnalystRoute>
                             } 
                         />
                         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,7 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import * as userModel from '../models/userModel.js';
-import { auth } from '../middleware/auth.js';
+import { auth, isAdmin, hasRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ const router = express.Router();
 router.post('/register', async (req, res) => {
     try {
         console.log('Registration request received:', req.body);
-        const { username, email, password } = req.body;
+        const { username, email, password, role } = req.body;
         
         if (!username || !email || !password) {
             return res.status(400).json({ message: 'All fields are required' });
@@ -21,7 +21,7 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Email already registered' });
         }
 
-        // Create new user
+        // Create new user (regular users can only be created with default role)
         const user = await userModel.createUser({ username, email, password });
         console.log('User created:', user);
         
@@ -50,7 +50,8 @@ router.post('/register', async (req, res) => {
             user: {
                 id: user.id,
                 username: user.username,
-                email: user.email
+                email: user.email,
+                role: user.role
             },
             accessToken
         });
@@ -101,7 +102,8 @@ router.post('/login', async (req, res) => {
             user: {
                 id: user.id,
                 username: user.username,
-                email: user.email
+                email: user.email,
+                role: user.role
             },
             accessToken
         });
@@ -153,7 +155,110 @@ router.post('/logout', auth, async (req, res) => {
 
 // Protected route test
 router.get('/protected', auth, (req, res) => {
-    res.json({ message: 'This is a protected route', userId: req.user.userId });
+    res.json({ 
+        message: 'This is a protected route', 
+        userId: req.user.userId,
+        role: req.user.role 
+    });
+});
+
+// Get current user profile
+router.get('/me', auth, async (req, res) => {
+    try {
+        const user = await userModel.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Don't send sensitive information like password or refresh token
+        const { password, refreshToken, ...userInfo } = user;
+        res.json(userInfo);
+    } catch (error) {
+        console.error('Error getting user profile:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Admin: Get all users
+router.get('/users', auth, isAdmin, async (req, res) => {
+    try {
+        const { rows } = await userModel.query('SELECT id, username, email, role, "createdAt", "updatedAt" FROM users');
+        res.json(rows);
+    } catch (error) {
+        console.error('Error getting users:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Admin: Create user with specific role
+router.post('/users', auth, isAdmin, async (req, res) => {
+    try {
+        const { username, email, password, role } = req.body;
+        
+        if (!username || !email || !password || !role) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
+        
+        // Validate role
+        const validRoles = Object.values(userModel.ROLES);
+        if (!validRoles.includes(role)) {
+            return res.status(400).json({ 
+                message: `Invalid role. Must be one of: ${validRoles.join(', ')}` 
+            });
+        }
+        
+        // Check if user exists
+        const existingUser = await userModel.findByEmail(email);
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email already registered' });
+        }
+
+        // Create new user with specified role
+        const user = await userModel.createUser({ username, email, password, role });
+        
+        // Don't send sensitive information
+        const { password: pwd, refreshToken, ...userInfo } = user;
+        res.status(201).json(userInfo);
+    } catch (error) {
+        console.error('Error creating user:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Admin: Update user role
+router.put('/users/:id/role', auth, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { role } = req.body;
+        
+        if (!role) {
+            return res.status(400).json({ message: 'Role is required' });
+        }
+        
+        // Validate role
+        const validRoles = Object.values(userModel.ROLES);
+        if (!validRoles.includes(role)) {
+            return res.status(400).json({ 
+                message: `Invalid role. Must be one of: ${validRoles.join(', ')}` 
+            });
+        }
+        
+        // Check if user exists
+        const existingUser = await userModel.findById(id);
+        if (!existingUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Update user role
+        const updatedUser = await userModel.updateUserRole(id, role);
+        
+        // Don't send sensitive information
+        const { password, refreshToken, ...userInfo } = updatedUser;
+        res.json(userInfo);
+    } catch (error) {
+        console.error('Error updating user role:', error);
+        res.status(500).json({ message: error.message });
+    }
 });
 
 export default router; 
